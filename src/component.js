@@ -5,8 +5,13 @@ import { patch } from './diff/patch';
 import { DIRTY_BIT, FORCE_UPDATE, MODE_UNMOUNTING } from './constants';
 import { getParentContext, getParentDom } from './tree';
 
+/**
+ * The render queue
+ * @type {import('./internal').RendererState}
+ */
 export const rendererState = {
-	_context: {}
+	_context: {},
+	_commitQueue: []
 };
 
 /**
@@ -102,10 +107,10 @@ function rerender(internal) {
 			0
 		);
 
-		const commitQueue = [];
 		rendererState._context = getParentContext(internal);
-		patch(parentDom, vnode, internal, commitQueue);
-		commitRoot(commitQueue, internal);
+		rendererState._commitQueue = [];
+		patch(parentDom, vnode, internal);
+		commitRoot(internal);
 	}
 }
 

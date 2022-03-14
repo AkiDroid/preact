@@ -1,3 +1,4 @@
+import { rendererState } from '../component';
 import options from '../options';
 
 /**
@@ -13,11 +14,12 @@ export function addCommitCallback(internal, callback) {
 }
 
 /**
- * @param {import('../internal').CommitQueue} commitQueue List of components
- * which have callbacks to invoke in commitRoot
  * @param {import('../internal').Internal} rootInternal
  */
-export function commitRoot(commitQueue, rootInternal) {
+export function commitRoot(rootInternal) {
+	let commitQueue = [].concat(rendererState._commitQueue);
+	rendererState._commitQueue = [];
+
 	if (options._commit) options._commit(rootInternal, commitQueue);
 
 	commitQueue.some(internal => {

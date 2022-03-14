@@ -28,10 +28,8 @@ import { rendererState } from '../component';
  * @param {import('../internal').PreactElement} parentDom The parent of the DOM element
  * @param {import('../internal').VNode | string} newVNode The new virtual node
  * @param {import('../internal').Internal} internal The Internal node to patch
- * @param {import('../internal').CommitQueue} commitQueue List of components
- * which have callbacks to invoke in commitRoot
  */
-export function patch(parentDom, newVNode, internal, commitQueue) {
+export function patch(parentDom, newVNode, internal) {
 	let dom = internal._dom;
 	let flags = internal.flags;
 
@@ -53,7 +51,7 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
 	if (flags & TYPE_ELEMENT) {
 		if (newVNode._vnodeId !== internal._vnodeId) {
 			// @ts-ignore dom is a PreactElement here
-			patchDOMElement(dom, newVNode, internal, commitQueue);
+			patchDOMElement(dom, newVNode, internal);
 			// Once we have successfully rendered the new VNode, copy it's ID over
 			internal._vnodeId = newVNode._vnodeId;
 		}
@@ -136,7 +134,6 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
 					parentDom,
 					Array.isArray(renderResult) ? renderResult : [renderResult],
 					internal,
-					commitQueue,
 					(internal.flags & (MODE_HYDRATE | MODE_SUSPENDED)) ===
 						(MODE_HYDRATE | MODE_SUSPENDED)
 						? internal._dom
@@ -148,14 +145,13 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
 				diffChildren(
 					parentDom,
 					Array.isArray(renderResult) ? renderResult : [renderResult],
-					internal,
-					commitQueue
+					internal
 				);
 			}
 		}
 
 		if (internal._commitCallbacks != null && internal._commitCallbacks.length) {
-			commitQueue.push(internal);
+			rendererState._commitQueue.push(internal);
 		}
 
 		// In the event this subtree creates a new context for its children, restore
@@ -182,10 +178,8 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
  * the virtual nodes being diffed
  * @param {import('../internal').VNode} newVNode The new virtual node
  * @param {import('../internal').Internal} internal The Internal node to patch
- * @param {import('../internal').CommitQueue} commitQueue List of components
- * which have callbacks to invoke in commitRoot
  */
-function patchDOMElement(dom, newVNode, internal, commitQueue) {
+function patchDOMElement(dom, newVNode, internal) {
 	let oldProps = internal.props,
 		newProps = (internal.props = newVNode.props),
 		isSvg = internal.flags & MODE_SVG,
@@ -237,7 +231,6 @@ function patchDOMElement(dom, newVNode, internal, commitQueue) {
 			dom,
 			newChildren && Array.isArray(newChildren) ? newChildren : [newChildren],
 			internal,
-			commitQueue,
 			dom.firstChild
 		);
 	}

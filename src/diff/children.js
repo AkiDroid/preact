@@ -20,15 +20,8 @@ import { createInternal, getDomSibling } from '../tree';
  * @param {import('../internal').ComponentChildren[]} renderResult
  * @param {import('../internal').Internal} parentInternal The Internal node
  * whose children should be diff'ed against newParentVNode
- * @param {import('../internal').CommitQueue} commitQueue List of
- * components which have callbacks to invoke in commitRoot
  */
-export function diffChildren(
-	parentDom,
-	renderResult,
-	parentInternal,
-	commitQueue
-) {
+export function diffChildren(parentDom, renderResult, parentInternal) {
 	let oldChildren =
 		(parentInternal._children && parentInternal._children.slice()) || EMPTY_ARR;
 
@@ -85,7 +78,6 @@ export function diffChildren(
 				parentDom,
 				childVNode,
 				childInternal,
-				commitQueue,
 				getDomSibling(parentInternal, skewedIndex)
 			);
 		}
@@ -98,18 +90,12 @@ export function diffChildren(
 			// We are resuming the hydration of a VNode
 			oldVNodeRef = childInternal.ref;
 
-			mount(
-				parentDom,
-				childVNode,
-				childInternal,
-				commitQueue,
-				childInternal._dom
-			);
+			mount(parentDom, childVNode, childInternal, childInternal._dom);
 		} else {
 			oldVNodeRef = childInternal.ref;
 
 			// Morph the old element into the new one, but don't append it to the dom yet
-			patch(parentDom, childVNode, childInternal, commitQueue);
+			patch(parentDom, childVNode, childInternal);
 		}
 
 		newDom = childInternal._dom;
