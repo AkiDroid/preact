@@ -12,16 +12,15 @@ import { mount } from './mount';
 import { patch } from './patch';
 import { unmount } from './unmount';
 import { createInternal, getDomSibling } from '../tree';
+import { rendererState } from '../component';
 
 /**
  * Diff the children of a virtual node
- * @param {import('../internal').PreactElement} parentDom The DOM element whose
- * children are being diffed
  * @param {import('../internal').ComponentChildren[]} renderResult
  * @param {import('../internal').Internal} parentInternal The Internal node
  * whose children should be diff'ed against newParentVNode
  */
-export function diffChildren(parentDom, renderResult, parentInternal) {
+export function diffChildren(renderResult, parentInternal) {
 	let oldChildren =
 		(parentInternal._children && parentInternal._children.slice()) || EMPTY_ARR;
 
@@ -75,7 +74,6 @@ export function diffChildren(parentDom, renderResult, parentInternal) {
 
 			// We are mounting a new VNode
 			mount(
-				parentDom,
 				childVNode,
 				childInternal,
 				getDomSibling(parentInternal, skewedIndex)
@@ -90,12 +88,12 @@ export function diffChildren(parentDom, renderResult, parentInternal) {
 			// We are resuming the hydration of a VNode
 			oldVNodeRef = childInternal.ref;
 
-			mount(parentDom, childVNode, childInternal, childInternal._dom);
+			mount(childVNode, childInternal, childInternal._dom);
 		} else {
 			oldVNodeRef = childInternal.ref;
 
 			// Morph the old element into the new one, but don't append it to the dom yet
-			patch(parentDom, childVNode, childInternal);
+			patch(childVNode, childInternal);
 		}
 
 		newDom = childInternal._dom;
@@ -120,8 +118,10 @@ export function diffChildren(parentDom, renderResult, parentInternal) {
 
 			// Perform insert of new dom
 			if (childInternal.flags & TYPE_DOM) {
-				let nextSibling = getDomSibling(parentInternal, skewedIndex);
-				parentDom.insertBefore(childInternal._dom, nextSibling);
+				rendererState._parentDom.insertBefore(
+					childInternal._dom,
+					getDomSibling(parentInternal, skewedIndex)
+				);
 			}
 		} else if (matchingIndex !== skewedIndex) {
 			// Move this DOM into its correct place
@@ -152,9 +152,13 @@ export function diffChildren(parentDom, renderResult, parentInternal) {
 
 			let nextSibling = getDomSibling(parentInternal, skewedIndex + 1);
 			if (childInternal.flags & TYPE_DOM) {
-				parentDom.insertBefore(childInternal._dom, nextSibling);
+				rendererState._parentDom.insertBefore(childInternal._dom, nextSibling);
 			} else {
-				insertComponentDom(childInternal, nextSibling, parentDom);
+				insertComponentDom(
+					childInternal,
+					nextSibling,
+					rendererState._parentDom
+				);
 			}
 		}
 

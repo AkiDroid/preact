@@ -25,11 +25,10 @@ import { rendererState } from '../component';
 
 /**
  * Diff two virtual nodes and apply proper changes to the DOM
- * @param {import('../internal').PreactElement} parentDom The parent of the DOM element
  * @param {import('../internal').VNode | string} newVNode The new virtual node
  * @param {import('../internal').Internal} internal The Internal node to patch
  */
-export function patch(parentDom, newVNode, internal) {
+export function patch(newVNode, internal) {
 	let dom = internal._dom;
 	let flags = internal.flags;
 
@@ -68,14 +67,16 @@ export function patch(parentDom, newVNode, internal) {
 	// Root nodes signal that an attempt to render into a specific DOM node on
 	// the page. Root nodes can occur anywhere in the tree and not just at the
 	// top.
-	let prevParentDom = parentDom;
+	let prevParentDom = rendererState._parentDom;
 	if (flags & TYPE_ROOT) {
-		parentDom = newVNode.props._parentDom;
+		rendererState._parentDom = newVNode.props._parentDom;
 
 		if (internal.props._parentDom !== newVNode.props._parentDom) {
 			let nextSibling =
-				parentDom == prevParentDom ? getDomSibling(internal) : null;
-			insertComponentDom(internal, nextSibling, parentDom);
+				rendererState._parentDom == prevParentDom
+					? getDomSibling(internal)
+					: null;
+			insertComponentDom(internal, nextSibling, rendererState._parentDom);
 		}
 	}
 
@@ -131,7 +132,6 @@ export function patch(parentDom, newVNode, internal) {
 
 			if (internal._children == null) {
 				mountChildren(
-					parentDom,
 					Array.isArray(renderResult) ? renderResult : [renderResult],
 					internal,
 					(internal.flags & (MODE_HYDRATE | MODE_SUSPENDED)) ===
@@ -143,7 +143,6 @@ export function patch(parentDom, newVNode, internal) {
 				);
 			} else {
 				diffChildren(
-					parentDom,
 					Array.isArray(renderResult) ? renderResult : [renderResult],
 					internal
 				);
@@ -153,6 +152,8 @@ export function patch(parentDom, newVNode, internal) {
 		if (internal._commitCallbacks != null && internal._commitCallbacks.length) {
 			rendererState._commitQueue.push(internal);
 		}
+
+		rendererState._parentDom = prevParentDom;
 
 		// In the event this subtree creates a new context for its children, restore
 		// the previous context for its siblings
@@ -226,13 +227,14 @@ function patchDOMElement(dom, newVNode, internal) {
 		internal._children = null;
 	} else {
 		if (oldHtml) dom.innerHTML = '';
-
+		const prevParentDom = rendererState._parentDom;
+		rendererState._parentDom = dom;
 		diffChildren(
-			dom,
 			newChildren && Array.isArray(newChildren) ? newChildren : [newChildren],
 			internal,
 			dom.firstChild
 		);
+		rendererState._parentDom = prevParentDom;
 	}
 
 	if (newProps.value != null && dom._isControlled) {

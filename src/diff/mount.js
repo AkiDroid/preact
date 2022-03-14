@@ -20,13 +20,12 @@ import options from '../options';
 import { rendererState } from '../component';
 /**
  * Diff two virtual nodes and apply proper changes to the DOM
- * @param {import('../internal').PreactElement} parentDom The parent of the DOM element
  * @param {import('../internal').VNode | string} newVNode The new virtual node
  * @param {import('../internal').Internal} internal The Internal node to mount
  * @param {import('../internal').PreactElement} startDom
  * @returns {import('../internal').PreactElement | null} pointer to the next DOM node to be hydrated (or null)
  */
-export function mount(parentDom, newVNode, internal, startDom) {
+export function mount(newVNode, internal, startDom) {
 	if (options._diff) options._diff(internal, newVNode);
 
 	/** @type {import('../index').ComponentChild} */
@@ -38,11 +37,11 @@ export function mount(parentDom, newVNode, internal, startDom) {
 			// the page. Root nodes can occur anywhere in the tree and not just at the
 			// top.
 			let prevStartDom = startDom;
-			let prevParentDom = parentDom;
+			let prevParentDom = rendererState._parentDom;
 			if (internal.flags & TYPE_ROOT) {
-				parentDom = newVNode.props._parentDom;
+				rendererState._parentDom = newVNode.props._parentDom;
 
-				if (parentDom !== prevParentDom) {
+				if (rendererState._parentDom !== prevParentDom) {
 					startDom = null;
 				}
 			}
@@ -80,7 +79,6 @@ export function mount(parentDom, newVNode, internal, startDom) {
 				: nextDomSibling;
 
 			nextDomSibling = mountChildren(
-				parentDom,
 				Array.isArray(renderResult) ? renderResult : [renderResult],
 				internal,
 				startDom
@@ -93,7 +91,10 @@ export function mount(parentDom, newVNode, internal, startDom) {
 				rendererState._commitQueue.push(internal);
 			}
 
-			if (internal.flags & TYPE_ROOT && prevParentDom !== parentDom) {
+			if (
+				internal.flags & TYPE_ROOT &&
+				prevParentDom !== rendererState._parentDom
+			) {
 				// If we just mounted a root node/Portal, and it changed the parentDom
 				// of it's children, then we need to resume the diff from it's previous
 				// startDom element, which could be null if we are mounting an entirely
@@ -102,6 +103,7 @@ export function mount(parentDom, newVNode, internal, startDom) {
 				nextDomSibling = prevStartDom;
 			}
 
+			rendererState._parentDom = prevParentDom;
 			// In the event this subtree creates a new context for its children, restore
 			// the previous context for its siblings
 			rendererState._context = prevContext;
@@ -253,12 +255,14 @@ function mountDOMElement(dom, internal) {
 			}
 			internal._children = null;
 		} else if (newChildren != null) {
+			const prevParentDom = rendererState._parentDom;
+			rendererState._parentDom = dom;
 			mountChildren(
-				dom,
 				newChildren && Array.isArray(newChildren) ? newChildren : [newChildren],
 				internal,
 				isNew ? null : dom.firstChild
 			);
+			rendererState._parentDom = prevParentDom;
 		}
 
 		// (as above, don't diff props during hydration)
@@ -273,18 +277,11 @@ function mountDOMElement(dom, internal) {
 
 /**
  * Diff the children of a virtual node
- * @param {import('../internal').PreactElement} parentDom The DOM element whose
- * children are being diffed
  * @param {import('../internal').ComponentChildren[]} renderResult
  * @param {import('../internal').Internal} parentInternal The parent Internal of the given children
  * @param {import('../internal').PreactElement} startDom
  */
-export function mountChildren(
-	parentDom,
-	renderResult,
-	parentInternal,
-	startDom
-) {
+export function mountChildren(renderResult, parentInternal, startDom) {
 	let internalChildren = (parentInternal._children = []),
 		i,
 		childVNode,
@@ -306,7 +303,7 @@ export function mountChildren(
 		internalChildren[i] = childInternal;
 
 		// Morph the old element into the new one, but don't append it to the dom yet
-		mountedNextChild = mount(parentDom, childVNode, childInternal, startDom);
+		mountedNextChild = mount(childVNode, childInternal, startDom);
 
 		newDom = childInternal._dom;
 
@@ -319,7 +316,7 @@ export function mountChildren(
 			// The DOM the diff should begin with is now startDom (since we inserted
 			// newDom before startDom) so ignore mountedNextChild and continue with
 			// startDom
-			parentDom.insertBefore(newDom, startDom);
+			rendererState._parentDom.insertBefore(newDom, startDom);
 		}
 
 		if (childInternal.ref) {

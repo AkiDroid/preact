@@ -10,6 +10,7 @@ import { getParentContext, getParentDom } from './tree';
  * @type {import('./internal').RendererState}
  */
 export const rendererState = {
+	_parentDom: null,
 	_context: {},
 	_commitQueue: []
 };
@@ -97,8 +98,6 @@ Component.prototype.render = Fragment;
  */
 function rerender(internal) {
 	if (~internal.flags & MODE_UNMOUNTING && internal.flags & DIRTY_BIT) {
-		let parentDom = getParentDom(internal);
-
 		const vnode = createVNode(
 			internal.type,
 			internal.props,
@@ -109,7 +108,8 @@ function rerender(internal) {
 
 		rendererState._context = getParentContext(internal);
 		rendererState._commitQueue = [];
-		patch(parentDom, vnode, internal);
+		rendererState._parentDom = getParentDom(internal);
+		patch(vnode, internal);
 		commitRoot(internal);
 	}
 }
