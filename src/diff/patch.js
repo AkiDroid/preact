@@ -18,9 +18,10 @@ import {
 	SKIP_CHILDREN,
 	DIRTY_BIT
 } from '../constants';
-import { getDomSibling, getParentContext } from '../tree';
+import { getDomSibling } from '../tree';
 import { mountChildren } from './mount';
 import { Fragment } from '../create-element';
+import { rendererState } from '../component';
 
 /**
  * Diff two virtual nodes and apply proper changes to the DOM
@@ -88,31 +89,28 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
 			internal.flags ^= MODE_PENDING_ERROR | MODE_RERENDERING_ERROR;
 		}
 
-		const context = getParentContext(internal);
-
+		let prevContext = rendererState._context;
 		// Necessary for createContext api. Setting this property will pass
 		// the context value as `this.context` just for this component.
 		let tmp = newVNode.type.contextType;
-		let provider = tmp && context[tmp._id];
+		let provider = tmp && rendererState._context[tmp._id];
 		let componentContext = tmp
 			? provider
 				? provider.props.value
 				: tmp._defaultValue
-			: context;
+			: rendererState._context;
 		let isNew = !internal || !internal._component;
 
 		if (internal.flags & TYPE_CLASS) {
 			nextDomSibling = renderClassComponent(
 				newVNode,
 				internal,
-				context,
 				componentContext
 			);
 		} else {
 			nextDomSibling = renderFunctionComponent(
 				newVNode,
 				internal,
-				context,
 				componentContext
 			);
 		}
@@ -159,6 +157,10 @@ export function patch(parentDom, newVNode, internal, commitQueue) {
 		if (internal._commitCallbacks != null && internal._commitCallbacks.length) {
 			commitQueue.push(internal);
 		}
+
+		// In the event this subtree creates a new context for its children, restore
+		// the previous context for its siblings
+		rendererState._context = prevContext;
 	} catch (e) {
 		// @TODO: assign a new VNode ID here? Or NaN?
 		// newVNode._vnodeId = 0;

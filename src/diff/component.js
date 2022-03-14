@@ -1,6 +1,7 @@
 import options from '../options';
 import { DIRTY_BIT, FORCE_UPDATE, SKIP_CHILDREN } from '../constants';
 import { addCommitCallback } from './commit';
+import { rendererState } from '../component';
 
 /**
  * Diff two virtual nodes and apply proper changes to the DOM
@@ -8,18 +9,12 @@ import { addCommitCallback } from './commit';
  * @param {import('../internal').Internal} internal The component's backing Internal node
  * @returns {import('../index').ComponentChild} pointer to the next DOM node (in order) to be rendered (or null)
  */
-export function renderFunctionComponent(
-	newVNode,
-	internal,
-	context,
-	componentContext
-) {
+export function renderFunctionComponent(newVNode, internal, componentContext) {
 	/** @type {import('../internal').Component} */
 	let c;
 	let tmp;
 
-	/** @type {import('../internal').ComponentType} */
-	let type = (internal.type);
+	let type = /** @type {import('../internal').ComponentType}*/ (internal.type);
 
 	// @TODO split update + mount?
 	let newProps = newVNode ? newVNode.props : internal.props;
@@ -27,11 +22,11 @@ export function renderFunctionComponent(
 	if (internal && internal._component) {
 		c = internal._component;
 	} else {
-		internal._component = c = {
+		internal._component = c = /** @type {import('../internal').Component}*/ ({
 			props: newProps,
 			context: componentContext,
 			forceUpdate: internal.rerender.bind(null, internal)
-		};
+		});
 
 		internal.flags |= DIRTY_BIT;
 	}
@@ -51,15 +46,18 @@ export function renderFunctionComponent(
 		counter++;
 		internal.flags &= ~DIRTY_BIT;
 		if ((tmp = options._render)) tmp(internal);
-		tmp = type.call(c, c.props, c.context);
+		tmp = type.call(c, c.props, componentContext);
 		if (!(internal.flags & DIRTY_BIT)) {
 			counter = 25;
 		}
 	}
 	internal.flags &= ~DIRTY_BIT;
-
 	if (c.getChildContext != null) {
-		internal._context = Object.assign({}, context, c.getChildContext());
+		rendererState._context = internal._context = Object.assign(
+			{},
+			rendererState._context,
+			c.getChildContext()
+		);
 	}
 
 	return tmp;
@@ -71,18 +69,12 @@ export function renderFunctionComponent(
  * @param {import('../internal').Internal} internal The component's backing Internal node
  * @returns {import('../index').ComponentChild} pointer to the next DOM node (in order) to be rendered (or null)
  */
-export function renderClassComponent(
-	newVNode,
-	internal,
-	context,
-	componentContext
-) {
+export function renderClassComponent(newVNode, internal, componentContext) {
 	/** @type {import('../internal').Component} */
 	let c;
 	let isNew, oldProps, oldState, snapshot, tmp;
 
-	/** @type {import('../internal').ComponentType} */
-	let type = (internal.type);
+	let type = /** @type {import('../internal').ComponentType}*/ (internal.type);
 
 	// @TODO split update + mount?
 	let newProps = newVNode ? newVNode.props : internal.props;
@@ -168,7 +160,11 @@ export function renderClassComponent(
 	c.state = c._nextState;
 
 	if (c.getChildContext != null) {
-		internal._context = Object.assign({}, context, c.getChildContext());
+		rendererState._context = internal._context = Object.assign(
+			{},
+			rendererState._context,
+			c.getChildContext()
+		);
 	}
 
 	if (!isNew) {

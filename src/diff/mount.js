@@ -17,6 +17,7 @@ import { setProperty } from './props';
 import { renderClassComponent, renderFunctionComponent } from './component';
 import { createInternal, getParentContext } from '../tree';
 import options from '../options';
+import { rendererState } from '../component';
 /**
  * Diff two virtual nodes and apply proper changes to the DOM
  * @param {import('../internal').PreactElement} parentDom The parent of the DOM element
@@ -48,32 +49,25 @@ export function mount(parentDom, newVNode, internal, commitQueue, startDom) {
 				}
 			}
 
-			const context = getParentContext(internal);
-
+			let prevContext = rendererState._context;
 			// Necessary for createContext api. Setting this property will pass
 			// the context value as `this.context` just for this component.
 			let tmp = newVNode.type.contextType;
-			let provider = tmp && context[tmp._id];
+			let provider = tmp && rendererState._context[tmp._id];
 			let componentContext = tmp
 				? provider
 					? provider.props.value
 					: tmp._defaultValue
-				: context;
+				: rendererState._context;
 
 			if (provider) provider._subs.add(internal);
 
 			if (internal.flags & TYPE_CLASS) {
-				nextDomSibling = renderClassComponent(
-					null,
-					internal,
-					context,
-					componentContext
-				);
+				nextDomSibling = renderClassComponent(null, internal, componentContext);
 			} else {
 				nextDomSibling = renderFunctionComponent(
 					null,
 					internal,
-					context,
 					componentContext
 				);
 			}
@@ -110,6 +104,10 @@ export function mount(parentDom, newVNode, internal, commitQueue, startDom) {
 				// an existing tree.
 				nextDomSibling = prevStartDom;
 			}
+
+			// In the event this subtree creates a new context for its children, restore
+			// the previous context for its siblings
+			rendererState._context = prevContext;
 		} else {
 			let hydrateDom =
 				internal.flags & (MODE_HYDRATE | MODE_MUTATIVE_HYDRATE)
